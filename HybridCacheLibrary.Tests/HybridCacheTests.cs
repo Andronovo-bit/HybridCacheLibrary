@@ -60,7 +60,6 @@ namespace HybridCacheLibrary.Tests
             cache.SetCapacity(3);
             cache.Add("key3", "value3");
 
-
             Assert.Equal("value3", cache.Get("key3"));
 
             cache.SetCapacity(2); // This should evict the item with the lowest frequency
