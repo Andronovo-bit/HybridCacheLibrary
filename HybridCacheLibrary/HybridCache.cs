@@ -30,13 +30,31 @@ namespace HybridCacheLibrary
                 throw new KeyNotFoundException("The given key was not present in the cache.");
             }
 
-            lock (node)
+            bool updateNeeded = false;
+
+            // Optimistically check if we need to update the frequency
+            var currentFrequency = node.Frequency;
+            var newFrequency = currentFrequency + 1;
+            if (!_frequencyList.TryGetValue(newFrequency, out _) || (node.Frequency != newFrequency))
             {
-                UpdateNodeFrequency(node);
+                updateNeeded = true;
+            }
+
+            if (updateNeeded)
+            {
+                lock (node)
+                {
+                    // Recheck the frequency in case it was updated in the meantime
+                    if (node.Frequency == currentFrequency)
+                    {
+                        UpdateNodeFrequency(node);
+                    }
+                }
             }
 
             return node.Value;
         }
+
 
         public void Add(K key, V value)
         {
@@ -60,38 +78,83 @@ namespace HybridCacheLibrary
             AddToFrequencyList(newNode);
         }
 
-        public void SetCapacity(int newCapacity)
-        {
-            _capacity = Math.Max(_initialCapacity, newCapacity);
-            while (_cache.Count > _capacity)
-            {
-                Evict();
-            }
-        }
 
         private void UpdateNodeFrequency(Node<K, V> node)
         {
             var oldFrequency = node.Frequency;
             var oldList = _frequencyList[oldFrequency];
+
+            // Düğümü eski frekans listesinden çıkarıyoruz
             oldList.Remove(node);
 
+            // Eğer bu, minimum frekanstaki son öğe ise, minFrequency'yi güncelle
             if (oldFrequency == _minFrequency && oldList.IsEmpty())
             {
                 _minFrequency++;
             }
 
+            // Frekansı artırıyoruz
             node.Frequency++;
+
+            // Yeni frekans listesine ekliyoruz
             AddToFrequencyList(node);
         }
 
+
         private void AddToFrequencyList(Node<K, V> node)
         {
-            _frequencyList.GetOrAdd(node.Frequency, _ => new DoublyLinkedList<K, V>()).AddFirst(node);
+            // Eğer ilgili frekans için bir liste yoksa, yeni bir liste oluştur ve ekle
+            if (!_frequencyList.TryGetValue(node.Frequency, out var list))
+            {
+                list = new DoublyLinkedList<K, V>();
+                _frequencyList[node.Frequency] = list;
+            }
+
+            // Düğümü listenin başına ekliyoruz
+            list.AddFirst(node);
+
+            // Minimum frekansın güncellenmesi
             if (node.Frequency == 1 || node.Frequency < _minFrequency)
             {
                 _minFrequency = node.Frequency;
             }
         }
+
+        public void SetCapacity(int newCapacity, bool shrink = false)
+        {
+            if (newCapacity < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(newCapacity), "Capacity must be greater than zero.");
+            }
+
+            if (newCapacity == _capacity)
+            {
+                return;
+            }
+
+            _capacity = Math.Max(_initialCapacity, newCapacity);
+
+            if (shrink)
+            {
+                _capacity = newCapacity;
+            }
+
+            // Sonsuz döngüyü önlemek için güvenlik kontrolü ekliyoruz.
+            int attempts = 0;
+            int maxAttempts = _cache.Count - _capacity;
+            while (_cache.Count > _capacity)
+            {
+                Evict();
+                attempts++;
+
+                // Eğer evict işlemi _cache.Count değerini düşürmüyorsa, döngüyü durdur
+                if (attempts > maxAttempts)
+                {
+                    break;
+                }
+            }
+        }
+
 
         private void Evict()
         {
@@ -100,10 +163,22 @@ namespace HybridCacheLibrary
                 var nodeToEvict = list.RemoveLast();
                 if (nodeToEvict != null)
                 {
-                    _cache.TryRemove(nodeToEvict.Key, out _);
-                    _nodePool.Return(nodeToEvict);
+                    if (_cache.TryRemove(nodeToEvict.Key, out _))
+                    {
+                        _nodePool.Return(nodeToEvict);
+                    }
+
+                    // Eğer liste boş kaldıysa, minimum frekansı güncelle
+                    if (list.IsEmpty())
+                    {
+                        _frequencyList.TryRemove(_minFrequency, out _);
+                        _minFrequency = _frequencyList.Count > 0 ? _frequencyList.Where(t => !t.Value.IsEmpty()).Min(t => t.Key) : 1;
+
+                        _frequencyList.Where(t => !t.Value.IsEmpty()).ToList();
+                    }
                 }
             }
         }
+
     }
 }

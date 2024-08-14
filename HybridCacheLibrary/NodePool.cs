@@ -22,12 +22,16 @@ namespace HybridCacheLibrary
 
         public void Return(Node<K, V> node)
         {
-            node.Key = default;
-            node.Value = default;
-            node.Frequency = 0;
-            node.Prev = null;
-            node.Next = null;
-            _pool.Add(node);
+            // Temizlemeden önce nesne tekrar kullanılabilir mi kontrol edilir
+            if (node != null)
+            {
+                node.Key = default;
+                node.Value = default;
+                node.Frequency = 0;
+                node.Prev = null;
+                node.Next = null;
+                _pool.Add(node);
+            }
         }
     }
 }
