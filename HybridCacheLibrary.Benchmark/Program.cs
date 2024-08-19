@@ -1,48 +1,80 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
+using Microsoft.Extensions.Caching.Memory;
+using static HybridCacheLibrary.Benchmark.HybridCacheBenchmark;
 
 namespace HybridCacheLibrary.Benchmark
 {
     [MemoryDiagnoser]
     public class HybridCacheBenchmark
     {
-        private HybridCache<int, string> _cache;
-
-        [Params(100, 1000, 10000)] // Different cache sizes
-        public int CacheSize { get; set; }
-
-        [GlobalSetup]
-        public void Setup()
+        [MemoryDiagnoser]
+        public class HybridCacheVsMemoryCacheBenchmark
         {
-            _cache = new HybridCache<int, string>(CacheSize);
-            for (int i = 0; i < CacheSize; i++)
+            private HybridCache<int, string> _hybridCache;
+            private MemoryCache _memoryCache;
+            private readonly MemoryCacheEntryOptions _cacheEntryOptions = new MemoryCacheEntryOptions
             {
-                _cache.Add(i, "value" + i);
-            }
-        }
+                SlidingExpiration = TimeSpan.FromMinutes(5)
+            };
 
-        [Benchmark]
-        public void AddItems()
-        {
-            for (int i = 0; i < CacheSize; i++)
+            [Params(100, 1000, 10000)] // Different cache sizes
+            public int CacheSize { get; set; }
+
+            [GlobalSetup]
+            public void Setup()
             {
-                _cache.Add(i, "newvalue" + i);
-            }
-        }
+                _hybridCache = new HybridCache<int, string>(CacheSize);
+                //_memoryCache = new MemoryCache(new MemoryCacheOptions());
 
-        [Benchmark]
-        public void GetItems()
-        {
-            for (int i = 0; i < CacheSize; i++)
+                for (int i = 0; i < CacheSize; i++)
+                {
+                    _hybridCache.Add(i, "value" + i);
+                    //_memoryCache.Set(i, "value" + i, _cacheEntryOptions);
+                }
+            }
+
+            //[Benchmark]
+            public void AddItemsHybridCache()
             {
-                _cache.Get(i);
+                for (int i = 0; i < CacheSize; i++)
+                {
+                    _hybridCache.Add(i, "newvalue" + i);
+                }
             }
-        }
 
-        [Benchmark]
-        public void SetCapacityAndEvict()
-        {
-            _cache.SetCapacity(CacheSize / 2);
+            [Benchmark]
+            public void GetItemsHybridCache()
+            {
+                for (int i = 0; i < CacheSize; i++)
+                {
+                    _hybridCache.Get(i);
+                }
+            }
+
+            //[Benchmark]
+            public void SetCapacityAndEvictHybridCache()
+            {
+                _hybridCache.SetCapacity(CacheSize / 2);
+            }
+
+            //[Benchmark]
+            public void AddItemsMemoryCache()
+            {
+                for (int i = 0; i < CacheSize; i++)
+                {
+                    _memoryCache.Set(i, "newvalue" + i, _cacheEntryOptions);
+                }
+            }
+
+           // [Benchmark]
+            public void GetItemsMemoryCache()
+            {
+                for (int i = 0; i < CacheSize; i++)
+                {
+                    _memoryCache.TryGetValue(i, out _);
+                }
+            }
         }
     }
     internal class Program
@@ -50,8 +82,28 @@ namespace HybridCacheLibrary.Benchmark
         static void Main(string[] args)
         {
             Console.WriteLine("Hello, World!");
-            var summary = BenchmarkRunner.Run<HybridCacheBenchmark>();
+            var summary = BenchmarkRunner.Run<HybridCacheVsMemoryCacheBenchmark>();
 
+            //Manual Test
+            /*
+            var cache = new HybridCache<int, string>(1000);
+
+
+            for (int i = 0; i < 1000; i++)
+            {
+                cache.Add(i, "value" + i);
+            }
+
+            for (int i = 0; i < 1000; i++)
+            {
+                cache.Get(i);
+            }
+
+            Console.WriteLine($" Part One Elapsed Time: {cache.partOneTotalWatch} ms");
+            Console.WriteLine($" Part Two Elapsed Time: {cache.partTwoTotalWatch} ms");
+            Console.WriteLine($" Part Three Elapsed Time: {cache.partThreeTotalWatch} ms");
+            */
+            
         }
     }
 }

@@ -107,5 +107,23 @@ namespace HybridCacheLibrary.Tests
             Assert.Equal("value5", cache.Get("key5"));
 
         }
+
+        [Fact]
+        public void Evicting_All_Items_Should_Work_Properly()
+        {
+            // Arrange
+            var cache = new HybridCache<string, string>(3);
+
+            // Act
+            cache.Add("key1", "value1");
+            cache.Add("key2", "value2");
+            cache.Add("key3", "value3");
+            cache.SetCapacity(1,true); // This should evict all but one item
+
+            // Assert
+            Assert.Throws<KeyNotFoundException>(() => cache.Get("key1"));
+            Assert.Throws<KeyNotFoundException>(() => cache.Get("key2"));
+            Assert.Equal("value3", cache.Get("key3")); // Only one item should remain
+        }
     }
 }
