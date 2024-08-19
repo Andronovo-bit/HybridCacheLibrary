@@ -2,6 +2,8 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Diagnostics;
 
 namespace HybridCacheLibrary
 {
@@ -18,7 +20,6 @@ namespace HybridCacheLibrary
         {
             get { return _capacity; }
         }
-
 
         public HybridCache(int capacity)
         {
@@ -41,25 +42,9 @@ namespace HybridCacheLibrary
             {
                 throw new KeyNotFoundException("The given key was not present in the cache.");
             }
-
-            bool updateNeeded = false;
-
-            var currentFrequency = node.Frequency;
-            var newFrequency = currentFrequency + 1;
-            if (!_frequencyList.TryGetValue(newFrequency, out _) || (node.Frequency != newFrequency))
+            lock (node)
             {
-                updateNeeded = true;
-            }
-
-            if (updateNeeded)
-            {
-                lock (node)
-                {
-                    if (node.Frequency == currentFrequency)
-                    {
-                        UpdateNodeFrequency(node);
-                    }
-                }
+                UpdateNodeFrequency(node);
             }
 
             return node.Value;
@@ -75,15 +60,32 @@ namespace HybridCacheLibrary
             return false;
         }
 
+        public int GetFrequency(K key)
+        {
+            if (!_cache.TryGetValue(key, out var node))
+            {
+                throw new KeyNotFoundException("The given key was not present in the cache.");
+            }
+            return node.Frequency;
+        }
+
         public void Add(K key, V value)
         {
             lock (this) // Kilitleme mekanizması ekliyoruz
             {
                 if (_cache.TryGetValue(key, out var existingNode))
                 {
+                    bool needsUpdate = false;
                     lock (existingNode)
                     {
-                        existingNode.Value = value;
+                        if (!EqualityComparer<V>.Default.Equals(existingNode.Value, value))
+                        {
+                            existingNode.Value = value;
+                            needsUpdate = true;
+                        }
+                    }
+                    if (needsUpdate)
+                    {
                         UpdateNodeFrequency(existingNode);
                     }
                     return;
@@ -97,39 +99,48 @@ namespace HybridCacheLibrary
                 var newNode = _nodePool.Get(key, value);
                 _cache[key] = newNode;
                 AddToFrequencyList(newNode);
+
+            }
+        }
+        private void AddToFrequencyList(Node<K, V> node)
+        {
+            // Eğer frekans listesi mevcut değilse, boş olan bir listeyi kullanmak yerine yeni bir tane oluşturuyoruz
+            if (!_frequencyList.TryGetValue(node.Frequency, out var list))
+            {
+                // Boş olan listeleri yeniden kullanmak
+                list = _frequencyList.FirstOrDefault(kv => kv.Value.IsEmpty()).Value ?? new DoublyLinkedList<K, V>();
+                _frequencyList[node.Frequency] = list;
+            }
+
+            list.AddFirst(node);
+
+            // Minimum frekansı sadece 1 ise veya mevcut frekanstan küçükse güncelleyin
+            if (node.Frequency == 1 || node.Frequency < _minFrequency)
+            {
+                _minFrequency = node.Frequency;
             }
         }
 
         private void UpdateNodeFrequency(Node<K, V> node)
         {
             var oldFrequency = node.Frequency;
-            var oldList = _frequencyList[oldFrequency];
-            oldList.Remove(node);
-
-            if (oldFrequency == _minFrequency && oldList.IsEmpty())
+            if (_frequencyList.TryGetValue(oldFrequency, out var oldList))
             {
-                _minFrequency++;
+                oldList.Remove(node);
+
+                if (oldFrequency == _minFrequency && oldList.IsEmpty())
+                {
+                    // Liste boşsa, içeriği başka bir dolu listeyle değiştirmek yerine kaldırıyoruz
+                    _minFrequency++;
+                    _frequencyList.TryRemove(oldFrequency, out _);
+                }
             }
 
             node.Frequency++;
             AddToFrequencyList(node);
         }
 
-        private void AddToFrequencyList(Node<K, V> node)
-        {
-            if (!_frequencyList.TryGetValue(node.Frequency, out var list))
-            {
-                list = new DoublyLinkedList<K, V>();
-                _frequencyList[node.Frequency] = list;
-            }
 
-            list.AddFirst(node);
-
-            if (node.Frequency == 1 || node.Frequency < _minFrequency)
-            {
-                _minFrequency = node.Frequency;
-            }
-        }
 
         public void SetCapacity(int newCapacity, bool shrink = false)
         {
@@ -179,10 +190,15 @@ namespace HybridCacheLibrary
                     if (list.IsEmpty())
                     {
                         _frequencyList.TryRemove(_minFrequency, out _);
-                        _minFrequency = _frequencyList.Count > 0 ? _frequencyList.Where(t => !t.Value.IsEmpty()).Min(t => t.Key) : 1;
+                        UpdateMinFrequency();
                     }
                 }
             }
+        }
+
+        private void UpdateMinFrequency()
+        {
+            _minFrequency = _frequencyList.Keys.Where(key => !_frequencyList[key].IsEmpty()).DefaultIfEmpty(1).Min();
         }
 
         public IEnumerator<KeyValuePair<K, V>> GetEnumerator()
