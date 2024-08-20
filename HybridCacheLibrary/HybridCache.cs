@@ -104,22 +104,20 @@ namespace HybridCacheLibrary
         }
         private void AddToFrequencyList(Node<K, V> node)
         {
-            // Eğer frekans listesi mevcut değilse, boş olan bir listeyi kullanmak yerine yeni bir tane oluşturuyoruz
             if (!_frequencyList.TryGetValue(node.Frequency, out var list))
             {
-                // Boş olan listeleri yeniden kullanmak
-                list = _frequencyList.FirstOrDefault(kv => kv.Value.IsEmpty()).Value ?? new DoublyLinkedList<K, V>();
+                list = new DoublyLinkedList<K, V>();
                 _frequencyList[node.Frequency] = list;
             }
 
             list.AddFirst(node);
 
-            // Minimum frekansı sadece 1 ise veya mevcut frekanstan küçükse güncelleyin
             if (node.Frequency == 1 || node.Frequency < _minFrequency)
             {
                 _minFrequency = node.Frequency;
             }
         }
+
 
         private void UpdateNodeFrequency(Node<K, V> node)
         {
@@ -198,7 +196,15 @@ namespace HybridCacheLibrary
 
         private void UpdateMinFrequency()
         {
-            _minFrequency = _frequencyList.Keys.Where(key => !_frequencyList[key].IsEmpty()).DefaultIfEmpty(1).Min();
+            foreach (var key in _frequencyList.Keys)
+            {
+                if (!_frequencyList[key].IsEmpty())
+                {
+                    _minFrequency = key;
+                    return;
+                }
+            }
+            _minFrequency = 1;
         }
 
         public IEnumerator<KeyValuePair<K, V>> GetEnumerator()
