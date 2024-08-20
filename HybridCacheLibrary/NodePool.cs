@@ -10,11 +10,7 @@ namespace HybridCacheLibrary
         {
             if (_pool.TryTake(out var node))
             {
-                node.Key = key;
-                node.Value = value;
-                node.Frequency = 1;
-                node.Prev = null;
-                node.Next = null;
+                InitializeNode(node, key, value);
                 return node;
             }
             return new Node<K, V>(key, value);
@@ -22,16 +18,29 @@ namespace HybridCacheLibrary
 
         public void Return(Node<K, V> node)
         {
-            // Temizlemeden önce nesne tekrar kullanılabilir mi kontrol edilir
             if (node != null)
             {
-                node.Key = default;
-                node.Value = default;
-                node.Frequency = 0;
-                node.Prev = null;
-                node.Next = null;
+                ResetNode(node);
                 _pool.Add(node);
             }
+        }
+
+        private void InitializeNode(Node<K, V> node, K key, V value)
+        {
+            node.Key = key;
+            node.Value = value;
+            node.Frequency = 1;
+            node.Prev = null;
+            node.Next = null;
+        }
+
+        private void ResetNode(Node<K, V> node)
+        {
+            node.Key = default;
+            node.Value = default;
+            node.Frequency = 0;
+            node.Prev = null;
+            node.Next = null;
         }
     }
 }
