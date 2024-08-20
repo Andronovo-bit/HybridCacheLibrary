@@ -1,19 +1,21 @@
-﻿using System.Collections.Concurrent;
+﻿using Microsoft.Extensions.ObjectPool;
 
 namespace HybridCacheLibrary
 {
     internal class NodePool<K, V>
     {
-        private readonly ConcurrentBag<Node<K, V>> _pool = new ConcurrentBag<Node<K, V>>();
+        private readonly ObjectPool<Node<K, V>> _nodePool;
+
+        public NodePool()
+        {
+            _nodePool = new DefaultObjectPool<Node<K, V>>(new DefaultPooledObjectPolicy<Node<K, V>>());
+        }
 
         public Node<K, V> Get(K key, V value)
         {
-            if (_pool.TryTake(out var node))
-            {
-                InitializeNode(node, key, value);
-                return node;
-            }
-            return new Node<K, V>(key, value);
+            var node = _nodePool.Get();
+            InitializeNode(node, key, value);
+            return node;
         }
 
         public void Return(Node<K, V> node)
@@ -21,7 +23,7 @@ namespace HybridCacheLibrary
             if (node != null)
             {
                 ResetNode(node);
-                _pool.Add(node);
+                _nodePool.Return(node);
             }
         }
 

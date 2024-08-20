@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Diagnostics;
 
 namespace HybridCacheLibrary
 {
@@ -15,11 +11,10 @@ namespace HybridCacheLibrary
         private readonly ConcurrentDictionary<int, DoublyLinkedList<K, V>> _frequencyList;
         private int _minFrequency;
         private readonly NodePool<K, V> _nodePool;
+        private readonly object _lockObject = new object();
+        private readonly ThreadLocal<Dictionary<K, V>> _threadLocalCache = new ThreadLocal<Dictionary<K, V>>(() => new Dictionary<K, V>());
 
-        public int Capacity
-        {
-            get { return _capacity; }
-        }
+        public int Capacity => _capacity;
 
         public HybridCache(int capacity)
         {
@@ -36,24 +31,39 @@ namespace HybridCacheLibrary
             return _cache.GetEnumerator();
         }
 
+
         public V Get(K key)
         {
+            var localCache = _threadLocalCache.Value;
+
+            if (localCache.TryGetValue(key, out var localValue))
+            {
+                return localValue;
+            }
+
             if (!_cache.TryGetValue(key, out var node))
             {
                 throw new KeyNotFoundException("The given key was not present in the cache.");
             }
+
             lock (node)
             {
                 UpdateNodeFrequency(node);
             }
 
+            localCache[key] = node.Value;
             return node.Value;
         }
+
         public bool TryGet(K key, out V value)
         {
             if (_cache.TryGetValue(key, out var node))
             {
-                value = Get(key); // Get method updates frequency and returns the value
+                value = node.Value;  // Directly accessing node's value without calling Get to avoid double lock
+                lock (node)
+                {
+                    UpdateNodeFrequency(node);
+                }
                 return true;
             }
             value = default;
@@ -71,22 +81,17 @@ namespace HybridCacheLibrary
 
         public void Add(K key, V value)
         {
-            lock (this) // Kilitleme mekanizması ekliyoruz
+            lock (_lockObject)
             {
                 if (_cache.TryGetValue(key, out var existingNode))
                 {
-                    bool needsUpdate = false;
                     lock (existingNode)
                     {
                         if (!EqualityComparer<V>.Default.Equals(existingNode.Value, value))
                         {
                             existingNode.Value = value;
-                            needsUpdate = true;
+                            UpdateNodeFrequency(existingNode);
                         }
-                    }
-                    if (needsUpdate)
-                    {
-                        UpdateNodeFrequency(existingNode);
                     }
                     return;
                 }
@@ -99,9 +104,9 @@ namespace HybridCacheLibrary
                 var newNode = _nodePool.Get(key, value);
                 _cache[key] = newNode;
                 AddToFrequencyList(newNode);
-
             }
         }
+
         private void AddToFrequencyList(Node<K, V> node)
         {
             if (!_frequencyList.TryGetValue(node.Frequency, out var list))
@@ -118,7 +123,6 @@ namespace HybridCacheLibrary
             }
         }
 
-
         private void UpdateNodeFrequency(Node<K, V> node)
         {
             var oldFrequency = node.Frequency;
@@ -128,7 +132,6 @@ namespace HybridCacheLibrary
 
                 if (oldFrequency == _minFrequency && oldList.IsEmpty())
                 {
-                    // Liste boşsa, içeriği başka bir dolu listeyle değiştirmek yerine kaldırıyoruz
                     _minFrequency++;
                     _frequencyList.TryRemove(oldFrequency, out _);
                 }
@@ -138,37 +141,31 @@ namespace HybridCacheLibrary
             AddToFrequencyList(node);
         }
 
-
-
         public void SetCapacity(int newCapacity, bool shrink = false)
         {
-            if (newCapacity < 1)
+            lock (_lockObject)
             {
-                throw new ArgumentOutOfRangeException(nameof(newCapacity), "Capacity must be greater than zero.");
-            }
-
-            if (newCapacity == _capacity)
-            {
-                return;
-            }
-
-            _capacity = Math.Max(_initialCapacity, newCapacity);
-
-            if (shrink)
-            {
-                _capacity = newCapacity;
-            }
-
-            int attempts = 0;
-            int maxAttempts = _cache.Count - _capacity;
-            while (_cache.Count > _capacity)
-            {
-                Evict();
-                attempts++;
-
-                if (attempts > maxAttempts)
+                if (newCapacity < 1)
                 {
-                    break;
+                    throw new ArgumentOutOfRangeException(nameof(newCapacity), "Capacity must be greater than zero.");
+                }
+
+                if (newCapacity == _capacity)
+                {
+                    return;
+                }
+
+                _capacity = Math.Max(_initialCapacity, newCapacity);
+
+                if (shrink)
+                {
+                    _capacity = newCapacity;
+                }
+
+                int itemsToRemove = Math.Max(0, _cache.Count - _capacity);
+                for (int i = 0; i < itemsToRemove; i++)
+                {
+                    Evict();
                 }
             }
         }
