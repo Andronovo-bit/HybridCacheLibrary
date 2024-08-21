@@ -25,16 +25,16 @@ namespace HybridCacheLibrary.Benchmark
             public void Setup()
             {
                 _hybridCache = new HybridCache<int, string>(CacheSize);
-                //_memoryCache = new MemoryCache(new MemoryCacheOptions());
+                _memoryCache = new MemoryCache(new MemoryCacheOptions());
 
                 for (int i = 0; i < CacheSize; i++)
                 {
                     _hybridCache.Add(i, "value" + i);
-                    //_memoryCache.Set(i, "value" + i, _cacheEntryOptions);
+                    _memoryCache.Set(i, "value" + i, _cacheEntryOptions);
                 }
             }
 
-            //[Benchmark]
+            [Benchmark]
             public void AddItemsHybridCache()
             {
                 for (int i = 0; i < CacheSize; i++)
@@ -52,13 +52,48 @@ namespace HybridCacheLibrary.Benchmark
                 }
             }
 
-            //[Benchmark]
-            public void SetCapacityAndEvictHybridCache()
+            [Benchmark]
+            public void HybridCache_LongRunning()
             {
-                _hybridCache.SetCapacity(CacheSize / 2);
+                for (int i = 0; i < 1000000; i++)
+                {
+                    _hybridCache.Add(i % CacheSize, $"Value {i}");
+                    var value = _hybridCache.Get(i % CacheSize);
+                }
             }
 
-            //[Benchmark]
+            [Benchmark]
+            public void MemoryCache_LongRunning()
+            {
+                for (int i = 0; i < 1000000; i++)
+                {
+                    _memoryCache.Set(i % CacheSize, $"Value {i}");
+                    var value = _memoryCache.Get(i % CacheSize);
+                }
+            }
+
+            [Benchmark]
+            public void HybridCache_Concurrent_Add_Get()
+            {
+                Parallel.For(0, CacheSize, i =>
+                {
+                    _hybridCache.Add(i, $"Value {i}");
+                    var value = _hybridCache.Get(i);
+                });
+            }
+
+            [Benchmark]
+            public void MemoryCache_Concurrent_Add_Get()
+            {
+                Parallel.For(0, CacheSize, i =>
+                {
+                    _memoryCache.Set(i, $"Value {i}");
+                    var value = _memoryCache.Get(i);
+                });
+            }
+
+
+            [Benchmark]
             public void AddItemsMemoryCache()
             {
                 for (int i = 0; i < CacheSize; i++)
@@ -67,7 +102,7 @@ namespace HybridCacheLibrary.Benchmark
                 }
             }
 
-           // [Benchmark]
+            [Benchmark]
             public void GetItemsMemoryCache()
             {
                 for (int i = 0; i < CacheSize; i++)
@@ -84,26 +119,6 @@ namespace HybridCacheLibrary.Benchmark
             Console.WriteLine("Hello, World!");
             var summary = BenchmarkRunner.Run<HybridCacheVsMemoryCacheBenchmark>();
 
-            //Manual Test
-            /*
-            var cache = new HybridCache<int, string>(1000);
-
-
-            for (int i = 0; i < 1000; i++)
-            {
-                cache.Add(i, "value" + i);
-            }
-
-            for (int i = 0; i < 1000; i++)
-            {
-                cache.Get(i);
-            }
-
-            Console.WriteLine($" Part One Elapsed Time: {cache.partOneTotalWatch} ms");
-            Console.WriteLine($" Part Two Elapsed Time: {cache.partTwoTotalWatch} ms");
-            Console.WriteLine($" Part Three Elapsed Time: {cache.partThreeTotalWatch} ms");
-            */
-            
         }
     }
 }
