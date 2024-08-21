@@ -40,7 +40,7 @@ To use **HybridCacheLibrary** in your project, you can include the library as a 
 
 
 ```bash
-git clone https://github.com/your-username/HybridCacheLibrary.git
+git clone https://github.com/Andronovo-bit/HybridCacheLibrary.git
 ```
 
 ## Usage
@@ -85,7 +85,7 @@ Below is a benchmark comparison between `HybridCache` and `MemoryCache` across v
   - At a cache size of 10,000, the difference is more pronounced, with `HybridCache` taking `468.137 us` versus `1,113.104 us` for `MemoryCache`.
 
 - **Get Operations**: 
-  - `HybridCache` also demonstrates superior performance in get operations across all cache sizes. For example, at a cache size of 10,000, `HybridCache` achieves `39.187 us` compared to `348.644 us` for `MemoryCache`.
+  - `HybridCache` also demonstrates superior performance in get operations across all cache sizes. For example, at a cache size of 10,000, `HybridCache` achieves `104.457 us` compared to `348.644 us` for `MemoryCache`.
   - This indicates that `HybridCache` is optimized for fast retrievals, especially in larger caches.
 
 - **Long-Running Operations**: 
