@@ -79,7 +79,14 @@ namespace HybridCacheLibrary
             return node.Frequency;
         }
 
+        // Default Add method
         public void Add(K key, V value)
+        {
+            Add(key, value, 1); // Default frequency to 1
+        }
+
+        // Overloaded Add method with Frequency
+        public void Add(K key, V value, int frequency)
         {
             lock (_lockObject)
             {
@@ -102,6 +109,7 @@ namespace HybridCacheLibrary
                 }
 
                 var newNode = _nodePool.Get(key, value);
+                newNode.Frequency = frequency;
                 _cache[key] = newNode;
                 AddToFrequencyList(newNode);
             }
