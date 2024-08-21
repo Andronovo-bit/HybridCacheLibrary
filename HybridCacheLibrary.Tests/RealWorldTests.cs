@@ -1,14 +1,20 @@
-﻿namespace HybridCacheLibrary.Tests
+﻿using Microsoft.Extensions.Caching.Memory;
+
+namespace HybridCacheLibrary.Tests
 {
     public class RealWorldTests
     {
+
+        private const int NumberOfThreads = 10;
+        private const int NumberOfItemsPerThread = 1000;
+
         [Fact]
         public async Task ConcurrentAccess_Should_Be_ThreadSafe()
         {
             // Arrange
             var cache = new HybridCache<int, string>(100);
-            int numberOfTasks = 10;
-            int numberOfItems = 1000;
+            int numberOfTasks = NumberOfThreads;
+            int numberOfItems = NumberOfItemsPerThread;
 
             // Act
             var tasks = new Task[numberOfTasks];
@@ -76,7 +82,7 @@
             {
                 Assert.True(dictionary.ContainsKey(item.Key));
             }
-            
+
         }
         [Fact]
         public void DynamicCapacityChange_Should_Adapt_Cache_Size()
@@ -129,7 +135,6 @@
             // Assert
             Assert.True(cache.GetType().GetField("_cache", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(cache).GetType().GetProperty("Count").GetValue(cache.GetType().GetField("_cache", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(cache)).Equals(1000));
         }
-        
 
         //Eğer varolan bir key yeniden eklenirse value değeri değişmişse frequency arttırılmalı ve minFrequency güncellenmeli
         [Fact]
@@ -154,5 +159,104 @@
             // Check frequency
             Assert.Equal(3, cache.GetFrequency(3));
         }
+
+        [Fact]
+        public async Task Concurrent_Add_And_Get_Should_Work_Correctly_Simultaneous()
+        {
+            var cache = new HybridCache<int, string>(NumberOfThreads * NumberOfItemsPerThread);
+            var tasks = new List<Task>();
+
+            for (int i = 0; i < NumberOfThreads; i++)
+            {
+                int threadId = i;
+                tasks.Add(Task.Run(() =>
+                {
+                    for (int j = 0; j < NumberOfItemsPerThread; j++)
+                    {
+                        int key = threadId * NumberOfItemsPerThread + j;
+                        cache.Add(key, $"Value {key}");
+                        var value = cache.Get(key);  // Add işleminden hemen sonra Get işlemi
+                        Assert.Equal($"Value {key}", value);
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+            Assert.Equal(NumberOfThreads * NumberOfItemsPerThread, cache.Capacity);
+        }
+
+        [Fact]
+        public async Task Sequential_Add_And_Get_Should_Work_Correctly()
+        {
+            var cache = new HybridCache<int, string>(NumberOfThreads * NumberOfItemsPerThread);
+
+            // Act
+            var addTasks = new List<Task>();
+
+            for (int i = 0; i < NumberOfThreads; i++)
+            {
+                int threadId = i;
+                addTasks.Add(Task.Run(() =>
+                {
+                    for (int j = 0; j < NumberOfItemsPerThread; j++)
+                    {
+                        int key = threadId * NumberOfItemsPerThread + j;
+                        cache.Add(key, $"Value {key}");
+                    }
+                }));
+            }
+
+            await Task.WhenAll(addTasks);
+
+            var getTasks = new List<Task>();
+
+            for (int i = 0; i < NumberOfThreads; i++)
+            {
+                int threadId = i;
+                getTasks.Add(Task.Run(() =>
+                {
+                    for (int j = 0; j < NumberOfItemsPerThread; j++)
+                    {
+                        int key = threadId * NumberOfItemsPerThread + j;
+                        var value = cache.Get(key);
+                        Assert.Equal($"Value {key}", value);
+                    }
+                }));
+            }
+
+            await Task.WhenAll(getTasks);
+
+            Assert.Equal(NumberOfThreads * NumberOfItemsPerThread, cache.Capacity);
+        }
+
+        [Fact]
+        public async Task Concurrent_Evict_Should_Work_Correctly()
+        {
+            // Arrange
+            var cache = new HybridCache<int, string>(NumberOfItemsPerThread);
+
+            // Act
+            var tasks = new List<Task>();
+
+            // Çok sayıda ekleme işlemi yapıyoruz, böylece evict işlemi de tetikleniyor
+            for (int i = 0; i < NumberOfThreads; i++)
+            {
+                tasks.Add(Task.Run(() =>
+                {
+                    for (int j = 0; j < NumberOfItemsPerThread; j++)
+                    {
+                        int key = i * NumberOfItemsPerThread + j;
+                        cache.Add(key, $"Value {key}");
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+
+            // Assert
+            // Evict sonrası cache boyutunu kontrol ediyoruz
+            Assert.Equal(NumberOfItemsPerThread, cache.Capacity);
+        }
+
     }
 }

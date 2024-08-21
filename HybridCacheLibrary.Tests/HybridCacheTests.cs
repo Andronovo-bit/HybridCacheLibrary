@@ -125,5 +125,66 @@ namespace HybridCacheLibrary.Tests
             Assert.Throws<KeyNotFoundException>(() => cache.Get("key2"));
             Assert.Equal("value3", cache.Get("key3")); // Only one item should remain
         }
+
+        [Fact]
+        public void Add_With_Frequency_Should_Set_Correct_Frequency()
+        {
+            // Arrange
+            var cache = new HybridCache<int, string>(10);
+
+            // Act
+            cache.Add(1, "Value1", 5); // Frequency 5
+            cache.Add(2, "Value2", 10); // Frequency 10
+            cache.Add(3, "Value3", 1); // Frequency 1
+
+            // Assert
+            Assert.Equal("Value1", cache.Get(1));
+            Assert.Equal(6, cache.GetFrequency(1)); // Frequency should be 6
+
+            Assert.Equal("Value2", cache.Get(2));
+            Assert.Equal(11, cache.GetFrequency(2)); // Frequency should be 11
+
+            Assert.Equal("Value3", cache.Get(3));
+            Assert.Equal(2, cache.GetFrequency(3)); // Frequency should be 2
+        }
+
+        [Fact]
+        public void Add_Without_Frequency_Should_Default_To_2()
+        {
+            // Arrange
+            var cache = new HybridCache<int, string>(10);
+
+            // Act
+            cache.Add(1, "Value1"); // Default frequency 1
+
+            // Assert
+            Assert.Equal("Value1", cache.Get(1)); // ++ frequency
+            Assert.Equal(2, cache.GetFrequency(1)); // Frequency should be 2
+        }
+
+        [Fact]
+        public void Add_With_Frequency_Should_Not_Evict_High_Frequency_Items()
+        {
+            // Arrange
+            var cache = new HybridCache<int, string>(3);
+
+            // Act
+            cache.Add(1, "Value1", 10); // High frequency
+            cache.Add(2, "Value2", 1);  // Low frequency
+            cache.Add(3, "Value3", 3);  // Low frequency
+
+            // Adding one more item should evict one of the low frequency items
+            cache.Add(4, "Value4", 1);
+
+            // Assert
+            Assert.Equal("Value1", cache.Get(1)); // High frequency item should remain
+            Assert.Equal(11, cache.GetFrequency(1)); // Frequency should be 11
+
+            // One of these should be evicted
+            Assert.Throws<KeyNotFoundException>(() => cache.Get(2));
+
+            Assert.Equal("Value4", cache.Get(4));
+            Assert.Equal(2, cache.GetFrequency(4)); // Frequency should be 2
+        }
     }
 }
