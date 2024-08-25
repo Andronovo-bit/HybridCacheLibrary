@@ -1,6 +1,7 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 using Microsoft.Extensions.Caching.Memory;
+using System.Net;
 using static HybridCacheLibrary.Benchmark.HybridCacheBenchmark;
 
 namespace HybridCacheLibrary.Benchmark
@@ -11,7 +12,7 @@ namespace HybridCacheLibrary.Benchmark
         [MemoryDiagnoser]
         public class HybridCacheVsMemoryCacheBenchmark
         {
-            private HybridCache<int, string> _hybridCache;
+            private CountBasedHybridCache<int, string> _hybridCache;
             private MemoryCache _memoryCache;
             private readonly MemoryCacheEntryOptions _cacheEntryOptions = new MemoryCacheEntryOptions
             {
@@ -24,7 +25,7 @@ namespace HybridCacheLibrary.Benchmark
             [GlobalSetup]
             public void Setup()
             {
-                _hybridCache = new HybridCache<int, string>(CacheSize);
+                _hybridCache = new CountBasedHybridCache<int, string>(CacheSize);
                 _memoryCache = new MemoryCache(new MemoryCacheOptions());
 
                 for (int i = 0; i < CacheSize; i++)
@@ -116,9 +117,37 @@ namespace HybridCacheLibrary.Benchmark
     {
         static void Main(string[] args)
         {
+            long beforeMemory = GC.GetTotalMemory(true);
+
+            var user = new User(1, "John Doe", 30, new Address("Istanbul", "Turkey"));
+
+            long afterMemory = GC.GetTotalMemory(true);
+
+            Console.WriteLine($"Memory used: {afterMemory - beforeMemory} bytes");
             Console.WriteLine("Hello, World!");
-            var summary = BenchmarkRunner.Run<HybridCacheVsMemoryCacheBenchmark>();
+            //var summary = BenchmarkRunner.Run<HybridCacheVsMemoryCacheBenchmark>();
 
         }
     }
+
+    internal class User
+    {
+        public User(int id, string name, int age, Address address)
+        {
+            Id = id;
+            Name = name;
+            Age = age;
+            Address = address;
+        }
+
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public int Age { get; set; }
+        public Address Address { get; set; }
+
+        public int[] ints { get; set; }
+
+        public List<string> strings { get; set; }
+    }
+    internal record Address(string City, string Country);
 }

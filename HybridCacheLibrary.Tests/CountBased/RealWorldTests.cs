@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
 
-namespace HybridCacheLibrary.Tests
+namespace HybridCacheLibrary.Tests.CountBased
 {
     public class RealWorldTests
     {
@@ -12,7 +12,7 @@ namespace HybridCacheLibrary.Tests
         public async Task ConcurrentAccess_Should_Be_ThreadSafe()
         {
             // Arrange
-            var cache = new HybridCache<int, string>(100);
+            var cache = new CountBasedHybridCache<int, string>(100);
             int numberOfTasks = NumberOfThreads;
             int numberOfItems = NumberOfItemsPerThread;
 
@@ -52,7 +52,7 @@ namespace HybridCacheLibrary.Tests
         public void HighFrequencyItems_Should_Stay_In_Cache()
         {
             // Arrange
-            var cache = new HybridCache<int, string>(10);
+            var cache = new CountBasedHybridCache<int, string>(10);
             var dictionary = new Dictionary<int, int>();
 
             // Act
@@ -88,7 +88,7 @@ namespace HybridCacheLibrary.Tests
         public void DynamicCapacityChange_Should_Adapt_Cache_Size()
         {
             // Arrange
-            var cache = new HybridCache<int, string>(10);
+            var cache = new CountBasedHybridCache<int, string>(10);
 
             // Act
             for (int i = 1; i <= 10; i++)
@@ -113,7 +113,7 @@ namespace HybridCacheLibrary.Tests
         public void Cache_Should_Perform_Under_Heavy_Load()
         {
             // Arrange
-            var cache = new HybridCache<int, string>(1000);
+            var cache = new CountBasedHybridCache<int, string>(1000);
 
             // Act
             for (int i = 1; i <= 10000; i++)
@@ -141,7 +141,7 @@ namespace HybridCacheLibrary.Tests
         public void Adding_Existing_Key_With_Different_Value_Should_Update_Frequency()
         {
             // Arrange
-            var cache = new HybridCache<int, string>(5);
+            var cache = new CountBasedHybridCache<int, string>(5);
 
             // Act
             cache.Add(1, "Value 1");
@@ -163,7 +163,7 @@ namespace HybridCacheLibrary.Tests
         [Fact]
         public async Task Concurrent_Add_And_Get_Should_Work_Correctly_Simultaneous()
         {
-            var cache = new HybridCache<int, string>(NumberOfThreads * NumberOfItemsPerThread);
+            var cache = new CountBasedHybridCache<int, string>(NumberOfThreads * NumberOfItemsPerThread);
             var tasks = new List<Task>();
 
             for (int i = 0; i < NumberOfThreads; i++)
@@ -188,7 +188,7 @@ namespace HybridCacheLibrary.Tests
         [Fact]
         public async Task Sequential_Add_And_Get_Should_Work_Correctly()
         {
-            var cache = new HybridCache<int, string>(NumberOfThreads * NumberOfItemsPerThread);
+            var cache = new CountBasedHybridCache<int, string>(NumberOfThreads * NumberOfItemsPerThread);
 
             // Act
             var addTasks = new List<Task>();
@@ -233,7 +233,7 @@ namespace HybridCacheLibrary.Tests
         public async Task Concurrent_Evict_Should_Work_Correctly()
         {
             // Arrange
-            var cache = new HybridCache<int, string>(NumberOfItemsPerThread);
+            var cache = new CountBasedHybridCache<int, string>(NumberOfItemsPerThread);
 
             // Act
             var tasks = new List<Task>();

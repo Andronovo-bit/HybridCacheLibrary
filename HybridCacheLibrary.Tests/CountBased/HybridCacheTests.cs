@@ -1,8 +1,7 @@
 using System;
 using Xunit;
-using HybridCacheLibrary;
 
-namespace HybridCacheLibrary.Tests
+namespace HybridCacheLibrary.Tests.CountBased
 {
     public class HybridCacheTests
     {
@@ -10,7 +9,7 @@ namespace HybridCacheLibrary.Tests
         public void Add_Get_Item_Should_Work()
         {
             // Arrange
-            var cache = new HybridCache<string, string>(3);
+            var cache = new CountBasedHybridCache<string, string>(3);
 
             // Act
             cache.Add("key1", "value1");
@@ -24,7 +23,7 @@ namespace HybridCacheLibrary.Tests
         public void Get_NonExistent_Key_Should_Throw_Exception()
         {
             // Arrange
-            var cache = new HybridCache<string, string>(3);
+            var cache = new CountBasedHybridCache<string, string>(3);
 
             // Act & Assert
             Assert.Throws<KeyNotFoundException>(() => cache.Get("key2"));
@@ -34,7 +33,7 @@ namespace HybridCacheLibrary.Tests
         public void Evict_When_Capacity_Exceeded_Should_Remove_Lowest_Frequency_Item()
         {
             // Arrange
-            var cache = new HybridCache<string, string>(2);
+            var cache = new CountBasedHybridCache<string, string>(2);
 
             // Act
             cache.Add("key1", "value1");
@@ -52,7 +51,7 @@ namespace HybridCacheLibrary.Tests
         public void SetCapacity_Should_Trim_Cache_If_Needed()
         {
             // Arrange
-            var cache = new HybridCache<string, string>(2);
+            var cache = new CountBasedHybridCache<string, string>(2);
 
             // Act
             cache.Add("key1", "value1");
@@ -73,7 +72,7 @@ namespace HybridCacheLibrary.Tests
         public void Increasing_Frequency_Should_Protect_Item_From_Eviction()
         {
             // Arrange
-            var cache = new HybridCache<string, string>(2);
+            var cache = new CountBasedHybridCache<string, string>(2);
 
             // Act
             cache.Add("key1", "value1");
@@ -91,7 +90,7 @@ namespace HybridCacheLibrary.Tests
         public void Increasing_Capacity_All_Items_Should_Work_Properly()
         {
             // Arrange
-            var cache = new HybridCache<string, string>(3);
+            var cache = new CountBasedHybridCache<string, string>(3);
 
             // Act
             cache.Add("key1", "value1");
@@ -112,13 +111,13 @@ namespace HybridCacheLibrary.Tests
         public void Evicting_All_Items_Should_Work_Properly()
         {
             // Arrange
-            var cache = new HybridCache<string, string>(3);
+            var cache = new CountBasedHybridCache<string, string>(3);
 
             // Act
             cache.Add("key1", "value1");
             cache.Add("key2", "value2");
             cache.Add("key3", "value3");
-            cache.SetCapacity(1,true); // This should evict all but one item
+            cache.SetCapacity(1, true); // This should evict all but one item
 
             // Assert
             Assert.Throws<KeyNotFoundException>(() => cache.Get("key1"));
@@ -130,7 +129,7 @@ namespace HybridCacheLibrary.Tests
         public void Add_With_Frequency_Should_Set_Correct_Frequency()
         {
             // Arrange
-            var cache = new HybridCache<int, string>(10);
+            var cache = new CountBasedHybridCache<int, string>(10);
 
             // Act
             cache.Add(1, "Value1", 5); // Frequency 5
@@ -152,7 +151,7 @@ namespace HybridCacheLibrary.Tests
         public void Add_Without_Frequency_Should_Default_To_2()
         {
             // Arrange
-            var cache = new HybridCache<int, string>(10);
+            var cache = new CountBasedHybridCache<int, string>(10);
 
             // Act
             cache.Add(1, "Value1"); // Default frequency 1
@@ -166,7 +165,7 @@ namespace HybridCacheLibrary.Tests
         public void Add_With_Frequency_Should_Not_Evict_High_Frequency_Items()
         {
             // Arrange
-            var cache = new HybridCache<int, string>(3);
+            var cache = new CountBasedHybridCache<int, string>(3);
 
             // Act
             cache.Add(1, "Value1", 10); // High frequency
